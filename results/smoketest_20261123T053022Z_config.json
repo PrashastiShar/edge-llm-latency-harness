@@ -1,0 +1,31 @@
+{
+  "url": "https://api.groq.com/openai/v1/chat/completions",
+  "model": "openai/gpt-oss-20b",
+  "requests": 10,
+  "runs": 1,
+  "warmup": 3,
+  "max_tokens": 256,
+  "gap": 0.2,
+  "timeout": 60,
+  "condition": "smoketest",
+  "out": "results",
+  "payload": {
+    "model": "openai/gpt-oss-20b",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Write a short paragraph about cloud computing."
+      }
+    ],
+    "stream": true,
+    "stream_options": {
+      "include_usage": true
+    },
+    "max_tokens": 256,
+    "temperature": 0
+  },
+  "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+  "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+  "requests_lib": "2.34.2",
+  "started_utc": "20261123T053022Z"
+}

@@ -1,0 +1,5 @@
+.venv/
+venv/
+.env
+battery-report.html
+__pycache__/

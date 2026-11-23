@@ -1,0 +1,31 @@
+{
+  "url": "http://localhost:11434/v1/chat/completions",
+  "model": "qwen2.5:1.5b",
+  "requests": 100,
+  "runs": 5,
+  "warmup": 3,
+  "max_tokens": 256,
+  "gap": 0.2,
+  "timeout": 60,
+  "condition": "edge-idle",
+  "out": "results",
+  "payload": {
+    "model": "qwen2.5:1.5b",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Write a short paragraph about cloud computing."
+      }
+    ],
+    "stream": true,
+    "stream_options": {
+      "include_usage": true
+    },
+    "max_tokens": 256,
+    "temperature": 0
+  },
+  "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+  "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+  "requests_lib": "2.34.2",
+  "started_utc": "20261123T105238Z"
+}
