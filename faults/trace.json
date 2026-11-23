@@ -1,0 +1,1 @@
+{"_comment": "Replay a recorded or synthetic trace (t_s,kbps,rtt_ms). Replace with your own phone-hotspot trace from record_trace.py.", "trace": "traces/synthetic_mobile.csv", "trace_loop": true}

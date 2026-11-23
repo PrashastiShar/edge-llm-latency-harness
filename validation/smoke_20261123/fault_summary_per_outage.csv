@@ -1,0 +1,6 @@
+condition,strategy,fault_on,outage,duration_s,requests_overlapping,failed,fell_back,no_service_s,recovery_s
+edge-outage,single,edge,1,4.589087963104248,12,8,0,3.461843252182007,0.3230562210083008
+fallback-edge-outage,fallback,edge,1,1.9992101192474365,6,0,6,0.15382170677185059,0.23963212966918945
+fallback-edge-outage,fallback,edge,2,2.0001349449157715,6,0,6,0.15360260009765625,
+cloud-outage,single,cloud,1,2.0013248920440674,3,2,0,2.258574962615967,0.2572500705718994
+cloud-outage,single,cloud,2,2.00177001953125,2,2,0,2.2558908462524414,0.2541208267211914

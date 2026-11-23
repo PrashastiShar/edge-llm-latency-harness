@@ -1,0 +1,1 @@
+{"_comment": "Network dead zone analogue: 20 s outage every 180 s; packets vanish, client must time out.", "outages": [{"first_s": 60, "every_s": 180, "duration_s": 20}], "outage_mode": "blackhole"}

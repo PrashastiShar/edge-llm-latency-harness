@@ -88,3 +88,8 @@
 
 ## Note
 - results/aborted/edge-idle_20261123T104907Z: run started 18:49 and stopped before any request completed (header only); excluded from analysis.
+
+## 2026-11-23: harness validation (mock servers)
+- tests/smoke_test.py: all 8 checks passed on the laptop; outputs in validation/smoke_20261123/
+- Mock servers only: validates the tooling (fault proxy, strategies, arrivals, fault analysis,
+  cost model), not research results. Kept out of results/ to avoid mixing with real data.

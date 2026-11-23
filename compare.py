@@ -30,18 +30,29 @@ def load(results_dir, conditions):
     if not frames:
         raise SystemExit(f"No matching *_requests.csv files in {results_dir}")
     df = pd.concat(frames, ignore_index=True)
-    return df[(df["status"] == 200) & df["ttft_s"].notna()]
+    df["ok"] = (df["status"] == 200) & df["ttft_s"].notna()
+    if "fell_back" not in df:
+        df["fell_back"] = False
+    df["fell_back"] = df["fell_back"].astype(str).str.lower().eq("true")
+    return df
 
 
 def summarise(df, order):
     rows = []
     for cond in order:
-        g = df[df["condition"] == cond]
+        allg = df[df["condition"] == cond]
+        g = allg[allg["ok"]]
         e2e = g["total_s"].to_numpy()
+        if len(e2e) == 0:
+            rows.append({"condition": cond, "n": 0, "success_rate": 0.0,
+                         "fallback_share": allg["fell_back"].mean(), "runs": 0})
+            continue
         per_run_p95 = g.groupby(["source_file", "run"])["total_s"].quantile(0.95)
         rows.append({
             "condition": cond,
             "n": len(g),
+            "success_rate": len(g) / len(allg),
+            "fallback_share": allg["fell_back"].mean(),
             "runs": len(per_run_p95),
             "mean_s": e2e.mean(),
             "p50_s": np.percentile(e2e, 50),
@@ -63,10 +74,11 @@ def main():
     ap.add_argument("--out", default="comparison")
     args = ap.parse_args()
 
-    df = load(args.results, args.conditions)
-    order = args.conditions or sorted(df["condition"].unique())
-    order = [c for c in order if c in set(df["condition"])]
-    table = summarise(df, order)
+    df_all = load(args.results, args.conditions)
+    df = df_all[df_all["ok"]]
+    order = args.conditions or sorted(df_all["condition"].unique())
+    order = [c for c in order if c in set(df_all["condition"])]
+    table = summarise(df_all, order)
 
     if args.baseline in set(table["condition"]):
         base = table.set_index("condition").loc[args.baseline]
@@ -77,15 +89,20 @@ def main():
     print(table.round(3).to_string(index=False))
     table.round(4).to_csv(args.out + "_table.csv", index=False)
     with open(args.out + "_table.md", "w") as f:
-        f.write("| Condition | n | Mean (s) | p50 | p95 | p99 | Max | p95 run sd |\n")
-        f.write("|---|---|---|---|---|---|---|---|\n")
-        for r in table.itertuples():
-            f.write(f"| {r.condition} | {r.n} | {r.mean_s:.2f} | {r.p50_s:.2f} | {r.p95_s:.2f} | "
+        f.write("| Condition | n ok | Success | Fallback | Mean (s) | p50 | p95 | p99 | Max | p95 run sd |\n")
+        f.write("|---|---|---|---|---|---|---|---|---|---|\n")
+        for r in table.fillna(float("nan")).itertuples():
+            if r.n == 0:
+                f.write(f"| {r.condition} | 0 | 0% | {r.fallback_share:.1%} | - | - | - | - | - | - |\n")
+                continue
+            f.write(f"| {r.condition} | {r.n} | {r.success_rate:.1%} | {r.fallback_share:.1%} | {r.mean_s:.2f} | {r.p50_s:.2f} | {r.p95_s:.2f} | "
                     f"{r.p99_s:.2f} | {r.max_s:.2f} | {r.p95_run_sd_s:.2f} |\n")
 
     fig, axes = plt.subplots(1, 2, figsize=(11, 4.2))
     for cond in order:
         v = np.sort(df.loc[df["condition"] == cond, "total_s"].to_numpy())
+        if len(v) == 0:
+            continue
         y = np.arange(1, len(v) + 1) / len(v)
         axes[0].step(v, y, where="post", label=f"{cond} (n={len(v)})")
         axes[1].step(v, 1 - y + 1 / len(v), where="post", label=cond)

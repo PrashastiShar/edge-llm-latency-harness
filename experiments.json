@@ -1,0 +1,39 @@
+{
+  "_comment": "One configuration file for the whole study. Edge = Ollama on the laptop. Cloud = Ollama on a VM reached through an SSH tunnel on local port 11435 (see cloud_setup.sh). Every request goes through faultproxy.py; a proxy with no fault file is transparent.",
+  "results_dir": "results",
+  "endpoints": {
+    "edge":  {"target": "127.0.0.1:11434", "proxy_port": 18081},
+    "cloud": {"target": "127.0.0.1:11435", "proxy_port": 18082}
+  },
+  "defaults": {"model": "qwen2.5:1.5b", "requests": 60, "runs": 5, "warmup": 3,
+               "max_tokens": 256, "ttft_deadline": 2.0},
+  "experiments": [
+    {"condition": "edge-proxied", "strategy": "single", "via": "edge",
+     "notes": "control: same as edge-idle but through a transparent proxy, to show proxy overhead"},
+
+    {"condition": "cloud-stable",  "strategy": "single", "via": "cloud"},
+    {"condition": "cloud-jittery", "strategy": "single", "via": "cloud",
+     "faults": {"cloud": "faults/jittery.json"}},
+    {"condition": "cloud-trace",   "strategy": "single", "via": "cloud",
+     "faults": {"cloud": "faults/trace.json"}},
+
+    {"condition": "fallback-stable",  "strategy": "fallback"},
+    {"condition": "fallback-jittery", "strategy": "fallback",
+     "faults": {"cloud": "faults/jittery.json"}},
+
+    {"condition": "edge-bursty",     "strategy": "single", "via": "edge",
+     "options": {"arrival": "bursty", "burst_size": 4, "burst_every": 30}},
+    {"condition": "cloud-bursty",    "strategy": "single", "via": "cloud",
+     "options": {"arrival": "bursty", "burst_size": 4, "burst_every": 30}},
+    {"condition": "fallback-bursty", "strategy": "fallback",
+     "options": {"arrival": "bursty", "burst_size": 4, "burst_every": 30}},
+
+    {"condition": "edge-outage",     "strategy": "single", "via": "edge",
+     "faults": {"edge": "faults/outage_reset.json"}},
+    {"condition": "fallback-edge-outage", "strategy": "fallback",
+     "faults": {"edge": "faults/outage_reset.json"}},
+    {"condition": "cloud-outage",    "strategy": "single", "via": "cloud",
+     "faults": {"cloud": "faults/outage_blackhole.json"},
+     "options": {"timeout": 30}}
+  ]
+}

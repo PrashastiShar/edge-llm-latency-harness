@@ -1,0 +1,109 @@
+{
+ "results_dir": "/tmp/harness_smoke_rj7fk3q3/results",
+ "endpoints": {
+  "edge": {
+   "target": "127.0.0.1:21434",
+   "proxy_port": 28081
+  },
+  "cloud": {
+   "target": "127.0.0.1:21435",
+   "proxy_port": 28082
+  }
+ },
+ "defaults": {
+  "model": "mock",
+  "requests": 25,
+  "runs": 1,
+  "warmup": 1,
+  "ttft_deadline": 0.5,
+  "gap": 0.1,
+  "no_plot": true
+ },
+ "experiments": [
+  {
+   "condition": "edge-proxied",
+   "strategy": "single",
+   "via": "edge"
+  },
+  {
+   "condition": "cloud-stable",
+   "strategy": "single",
+   "via": "cloud"
+  },
+  {
+   "condition": "cloud-jittery",
+   "strategy": "single",
+   "via": "cloud",
+   "faults": {
+    "cloud": "/tmp/harness_smoke_rj7fk3q3/faults/jit.json"
+   }
+  },
+  {
+   "condition": "cloud-trace",
+   "strategy": "single",
+   "via": "cloud",
+   "faults": {
+    "cloud": "/tmp/harness_smoke_rj7fk3q3/faults/trace.json"
+   }
+  },
+  {
+   "condition": "fallback-stable",
+   "strategy": "fallback"
+  },
+  {
+   "condition": "fallback-bursty",
+   "strategy": "fallback",
+   "options": {
+    "arrival": "bursty",
+    "burst_size": 8,
+    "burst_every": 2
+   }
+  },
+  {
+   "condition": "edge-bursty",
+   "strategy": "single",
+   "via": "edge",
+   "options": {
+    "arrival": "bursty",
+    "burst_size": 8,
+    "burst_every": 2
+   }
+  },
+  {
+   "condition": "cloud-bursty",
+   "strategy": "single",
+   "via": "cloud",
+   "options": {
+    "arrival": "bursty",
+    "burst_size": 8,
+    "burst_every": 2
+   }
+  },
+  {
+   "condition": "edge-outage",
+   "strategy": "single",
+   "via": "edge",
+   "faults": {
+    "edge": "/tmp/harness_smoke_rj7fk3q3/faults/reset.json"
+   }
+  },
+  {
+   "condition": "fallback-edge-outage",
+   "strategy": "fallback",
+   "faults": {
+    "edge": "/tmp/harness_smoke_rj7fk3q3/faults/reset.json"
+   }
+  },
+  {
+   "condition": "cloud-outage",
+   "strategy": "single",
+   "via": "cloud",
+   "faults": {
+    "cloud": "/tmp/harness_smoke_rj7fk3q3/faults/bh.json"
+   },
+   "options": {
+    "timeout": 1
+   }
+  }
+ ]
+}

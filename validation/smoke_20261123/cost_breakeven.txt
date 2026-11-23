@@ -1,0 +1,2 @@
+fallback-bursty vs cloud-bursty: hybrid cheaper while cloud prices > 1.63 x 'mid' (price ratio cloud/edge per request > 0.991)
+fallback-stable vs cloud-stable: hybrid cheaper while cloud prices > 0.2587 x 'mid' (price ratio cloud/edge per request > 1)

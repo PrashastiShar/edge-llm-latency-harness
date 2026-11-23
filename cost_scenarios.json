@@ -1,0 +1,14 @@
+{
+  "_comment": "HYPOTHETICAL labelled price scenarios, not billing data. Replace cloud_vm_per_hour with what you actually pay. edge_power_w = 29 W measured from the battery report (whole laptop). Device amortisation is an assumption: e.g. a 5000 CNY laptop over ~4500 h of active use is ~1.1 CNY/h.",
+  "currency": "CNY",
+  "scenarios": {
+    "low":  {"cloud_vm_per_hour": 0.3, "cloud_utilisation": 0.8, "egress_per_gb": 0.5,
+             "edge_power_w": 29, "electricity_per_kwh": 0.56, "edge_device_per_hour": 0.0},
+    "mid":  {"cloud_vm_per_hour": 1.0, "cloud_utilisation": 0.5, "egress_per_gb": 0.8,
+             "edge_power_w": 29, "electricity_per_kwh": 0.56, "edge_device_per_hour": 0.5},
+    "high": {"cloud_vm_per_hour": 10.0, "cloud_utilisation": 0.3, "egress_per_gb": 0.8,
+             "edge_power_w": 29, "electricity_per_kwh": 0.56, "edge_device_per_hour": 1.1},
+    "api":  {"cloud_api_per_m_output_tokens": 2.0, "egress_per_gb": 0.0,
+             "edge_power_w": 29, "electricity_per_kwh": 0.56, "edge_device_per_hour": 0.5}
+  }
+}

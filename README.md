@@ -1,47 +1,68 @@
-# llm-tail-latency
+# edge-llm-latency-harness
 
-Measurement harness for **tail latency of LLM inference**, built to test the evaluation
-practices proposed in the position paper *Limitations in Real-World Evaluation for
-Edge-Cloud Collaborative LLM Inference* (P. Sharma, Wuhan University of Technology).
+Reproducible harness for **tail latency, failure behaviour and cost of edge, cloud and
+hybrid LLM inference**. It implements the evaluation practices proposed in the position
+paper *Limitations in Real-World Evaluation for Edge-Cloud Collaborative LLM Inference*
+(P. Sharma, Wuhan University of Technology): Mini-project A (tail latency under network
+conditions) and Mini-project B (cost and energy accounting).
 
-**Status:** the edge-only arm of the paper's Mini-project A is done (2,000 logged requests,
-four device conditions). Cloud-only, network-fault injection and the hybrid fallback
-strategy are **not implemented yet** (see Roadmap).
+**Status**
+- Edge-only experiments: **done** (2,000 logged requests, four device conditions; results below).
+- Fault injection, cloud-only and hybrid strategies, bursty arrivals, cost model: **built and
+  tested end-to-end against mock servers** (`tests/smoke_test.py`, run in CI).
+  **Not yet run on real cloud hardware.**
 
-## What is here
+## Components
 
 | File | Purpose |
 |---|---|
-| `benchmark.py` | Streaming client for any OpenAI-compatible chat endpoint (Ollama, vLLM, hosted APIs). Logs **every request** to CSV: time to first token (TTFT), time per output token (TPOT), end-to-end latency, token count, HTTP status, errors. Writes a config file per run and reports p50/p95/p99. |
-| `compare.py` | Compares conditions: CDF and log-scale tail plot, plus a percentile table (CSV + Markdown) with change against a baseline. |
-| `EXPERIMENT_LOG.md` | Lab notebook: setup, device state, timeline, corrections and decisions for every run. |
-| `results/` | Raw per-request CSVs, run configs and per-run CDF plots. |
-| `comparison_*` | Cross-condition figure and tables. |
+| `benchmark.py` | Streaming client for any OpenAI-compatible endpoint. Strategies: `single` (edge-only or cloud-only) and `fallback` (edge first; cloud if no first token within a deadline or the edge fails). Arrivals: closed loop, Poisson, bursty. Logs every request: status, TTFT, time per output token, end-to-end time, bytes, which side served it, Unix start/end times. |
+| `faultproxy.py` | Fault-injection TCP proxy (no root; works in WSL and CI): delay and jitter, bandwidth limit, replay of a network trace, scheduled outages (`reset` = connections cut and refused, `blackhole` = traffic silently vanishes). Logs every fault event with timestamps. |
+| `run_all.py` + `experiments.json` | Runs the whole experiment matrix from one configuration file, each run through fault proxies, and writes `results/manifest.jsonl`. |
+| `compare.py` | CDF and log-scale tail plot; table with success rate, fallback share, p50/p95/p99 and change against a baseline. |
+| `analyze_faults.py` | Per outage: failed requests, fallbacks, time without service, recovery time after the fault clears. |
+| `cost.py` + `cost_scenarios.json` | Cost per successful request under labelled (hypothetical) price scenarios, edge energy per token, break-even price ratio for hybrid vs cloud-only. |
+| `record_trace.py` / `make_trace.py` | Record a real RTT trace (e.g. on a phone hotspot) without root / generate a clearly labelled synthetic one. |
+| `cloud_setup.sh`, `netem.sh` | Install the same model on a cloud VM (reached via SSH tunnel, no open port); packet-level `tc netem` on a real Linux host. |
+| `tests/` | Mock streaming server and end-to-end smoke test (also in `.github/workflows/smoke.yml`). |
+| `EXPERIMENT_LOG.md`, `results/` | Lab notebook and raw per-request data. |
 
-## Quick start
+## Quick start (edge only)
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-
-# local model via Ollama
 ollama pull qwen2.5:1.5b
-export GROQ_API_KEY=unused        # the script checks that a key variable exists
+export LLM_API_KEY=unused        # local servers ignore it; keys are never stored in code
 python benchmark.py --url http://localhost:11434/v1/chat/completions \
   --model qwen2.5:1.5b --requests 100 --runs 5 --condition edge-idle
-
-python compare.py --conditions edge-idle edge-battery edge-busy edge-stable
+python compare.py
 ```
 
-API keys are read from the environment, never from the code.
+Check the harness without any model: `python tests/smoke_test.py` (about 2 minutes).
+
+## Full study (edge + cloud + hybrid + faults)
+
+1. On a cloud VM: `bash cloud_setup.sh` (installs Ollama and `qwen2.5:1.5b`, prints hardware).
+2. On the laptop, keep a tunnel open: `ssh -N -L 11435:127.0.0.1:11434 USER@VM_IP`.
+3. Optional real trace: `python record_trace.py --host VM_IP --port 22 --seconds 600 --out traces/my_trace.csv`
+   and point `faults/trace.json` at it.
+4. `python run_all.py` (or `--only cloud-stable`), then:
+   `python compare.py`, `python analyze_faults.py`, `python cost.py`.
+
+The matrix in `experiments.json`: edge through a transparent proxy (control), cloud-only
+stable / jittery / trace, fallback stable / jittery, all three strategies under bursty
+arrivals, and outages on the edge (reset) or cloud (blackhole) path.
 
 ## Method
 
-- One fixed prompt, `temperature=0`, `max_tokens=256`; every reply was 136 tokens,
-  so latency differences reflect the system, not output length.
-- 3 warm-up requests discarded; then 5 runs x 100 sequential requests, 0.2 s gap (closed loop).
-- TTFT is measured at the first chunk containing text, not the first SSE line.
-- Failed requests are logged and excluded from latency statistics, never timed as successes.
+- One fixed prompt, `temperature=0`, `max_tokens=256`; replies were 136 tokens, so latency
+  differences reflect the system, not output length.
+- Warm-up requests discarded; at least 5 runs per condition.
+- TTFT is taken at the first chunk containing text. Failed requests are logged and
+  excluded from latency statistics, never timed as successes.
+- Fallback time includes the wasted edge attempt.
+- Proxy overhead (measured with the mock server): TTFT +0.5 ms; per-token timing unchanged.
 
 ## Results so far (edge-only)
 
@@ -58,34 +79,34 @@ Qwen2.5-1.5B. A laptop is **not** a constrained edge device; treat these as an u
 500 successful requests per condition. Highlights:
 
 - **Device state is a tail source, not only the network.** Background load raised p95 by
-  27% (one video) to roughly 89% (several apps), while battery alone changed nothing.
-- **A power-source switch coincided with a 24 s request** (about 4x the median), a single
+  27% (one video) to about 89% (several apps); battery alone changed nothing.
+- **A power-source switch coincided with a 24 s request** (about 4x the median): a single
   observed event, not a proven cause.
-- **Energy (coarse, whole-system, from Windows battery report):** about 170 J per request
-  (about 1.25 J per output token) at about 29 W. The slower apps-open state used about 38%
-  more energy per request despite lower power draw.
+- **Energy (coarse, whole-system, Windows battery report):** about 170 J per request
+  (about 1.25 J per output token) at about 29 W; the apps-open state used about 38% more
+  energy per request despite lower power draw.
 
 Details, timelines and corrections are in `EXPERIMENT_LOG.md`.
 
 ## Limitations
 
-Single prompt and model; sequential requests with no bursty arrivals; local model only,
-so no network in the path yet; laptop CPU rather than embedded hardware; energy from
-battery percentage, including screen and OS; output quality and privacy not evaluated.
+Single prompt and model; laptop CPU rather than embedded hardware; energy from battery
+percentage (includes screen and OS); prices are hypothetical scenarios; the proxy emulates
+delay, bandwidth and outages at application level, not packet loss (use `netem.sh` on a
+Linux host for that); in closed-loop runs a fast-failing outage produces many quick
+failures, so compare outages by time without service, not by failure counts; output
+quality and privacy are not evaluated.
 
-## Earlier version (withdrawn)
+## Earlier prototype (withdrawn)
 
-The first commit of this repo reported Groq API results (stable vs. jittery network).
-Those numbers are **withdrawn**: that script requested a model Groq had decommissioned,
-Groq is not reachable from the author's region, and the script did not check HTTP
-status, so it most likely timed error responses. The current `benchmark.py` fixes all
-three issues. The old files remain in the git history.
+An earlier repository reported Groq API latency under simulated jitter. Those numbers are
+**withdrawn**: the script requested a model Groq had decommissioned, Groq is not reachable
+from the author's region, and the script did not check HTTP status, so it most likely
+timed error responses. That repository has been deleted.
 
-## Roadmap
+## Next steps
 
-1. Cloud-only arm: same model on a cloud VM, measured from the laptop.
-2. Network conditions: `tc netem` delay, jitter and loss; replay of a recorded trace.
-3. **Fault injection:** scripted disconnections with recovery-time measurement.
-4. Confidence-based edge-to-cloud fallback strategy.
-5. Cost model and break-even price ratio (paper's Mini-project B).
-6. Automated, repeatable runs (CI) and bursty workloads.
+1. Run `experiments.json` against a real cloud VM; record a real mobile trace.
+2. Add a deliberate edge process crash (stop Ollama) alongside the proxy outages.
+3. Confidence-based fallback (needs token log-probabilities and a quality metric).
+4. Multi-step and multi-agent workflows under the same fault schedules.

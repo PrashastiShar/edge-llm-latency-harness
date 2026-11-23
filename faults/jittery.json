@@ -1,0 +1,1 @@
+{"_comment": "One-way delay and jitter added in each direction: RTT grows by about 80 ms +/- 40 ms.", "delay_ms": 40, "jitter_ms": 20}
